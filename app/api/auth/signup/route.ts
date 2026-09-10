@@ -45,6 +45,8 @@ export async function POST(req: Request) {
     select: { id: true, role: true },
   });
 
+  await prisma.loginEvent.create({ data: { userId: user.id, method: "SIGNUP" } }).catch(() => {});
+
   const res = NextResponse.json({ data: { id: user.id, role: user.role } });
   res.cookies.set("uid", user.id, {
     httpOnly: true,
