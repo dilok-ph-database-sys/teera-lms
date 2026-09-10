@@ -4,10 +4,18 @@
 // เรียกซ้ำได้ — ระบบจะล้างของเดิมแล้วใส่ใหม่ทุกครั้ง
 import { NextResponse } from "next/server";
 import { prisma as db } from "@/lib/prisma";
+import { hashPassword } from "@/lib/password";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+/** รหัสผ่านของบัญชีตัวอย่าง (ใช้เข้าสู่ระบบที่หน้า /login ได้จริง) */
+const DEMO_PASSWORDS = {
+  student: "student1234",
+  instructor: "teacher1234",
+  admin: "admin1234",
+};
 
 async function seed() {
   // ล้างของเดิม (เรียงตาม FK)
@@ -23,13 +31,13 @@ async function seed() {
 
   // ── ผู้ใช้ (บัญชีทดลอง) ──
   const student = await db.user.create({
-    data: { id: "u_student", email: "student@teera.dev", fullName: "ธีรา บุญมี", role: "STUDENT" },
+    data: { id: "u_student", email: "student@teera.dev", fullName: "ธีรา บุญมี", role: "STUDENT", passwordHash: await hashPassword(DEMO_PASSWORDS.student) },
   });
   await db.user.create({
-    data: { id: "u_instructor", email: "teacher@teera.dev", fullName: "อ.สมชาย วงศ์", role: "INSTRUCTOR" },
+    data: { id: "u_instructor", email: "teacher@teera.dev", fullName: "อ.สมชาย วงศ์", role: "INSTRUCTOR", passwordHash: await hashPassword(DEMO_PASSWORDS.instructor) },
   });
   await db.user.create({
-    data: { id: "u_admin", email: "admin@teera.dev", fullName: "ธีรา ผู้ดูแล", role: "ADMIN" },
+    data: { id: "u_admin", email: "admin@teera.dev", fullName: "ธีรา ผู้ดูแล", role: "ADMIN", passwordHash: await hashPassword(DEMO_PASSWORDS.admin) },
   });
 
   // ── คอร์ส 1: Next.js (มีบทเรียนเต็ม + ผู้เรียนคนนี้กำลังเรียน) ──
@@ -131,9 +139,9 @@ export async function GET() {
       message: "✓ ใส่ข้อมูลตัวอย่างสำเร็จแล้ว — กลับไปหน้าแรกได้เลย",
       result,
       accounts: [
-        "student@teera.dev (นักเรียน)",
-        "teacher@teera.dev (ผู้สอน)",
-        "admin@teera.dev (แอดมิน)",
+        `นักเรียน — student@teera.dev / ${DEMO_PASSWORDS.student}`,
+        `ผู้สอน  — teacher@teera.dev / ${DEMO_PASSWORDS.instructor}`,
+        `แอดมิน  — admin@teera.dev / ${DEMO_PASSWORDS.admin}`,
       ],
     });
   } catch (e) {
