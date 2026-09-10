@@ -20,6 +20,11 @@ model User {
   role      String   @default("STUDENT") // ADMIN | INSTRUCTOR | STUDENT
   createdAt DateTime @default(now())
 
+  // ── ข้อมูลส่วนตัวเพิ่มเติม (แก้ไขได้ที่หน้า /profile) ──
+  phone       String?
+  bio         String?
+  avatarEmoji String  @default("🙂")
+
   enrollments Enrollment[]
   orders      Order[]
 }
