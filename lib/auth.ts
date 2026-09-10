@@ -15,6 +15,10 @@ export interface AppUser {
   email: string;
   fullName: string;
   role: string;
+  phone: string | null;
+  bio: string | null;
+  avatarEmoji: string;
+  createdAt: Date;
 }
 
 export async function getCurrentUser(): Promise<AppUser | null> {
@@ -23,7 +27,16 @@ export async function getCurrentUser(): Promise<AppUser | null> {
 
   const user = await prisma.user.findUnique({
     where: { id: uid },
-    select: { id: true, email: true, fullName: true, role: true },
+    select: {
+      id: true,
+      email: true,
+      fullName: true,
+      role: true,
+      phone: true,
+      bio: true,
+      avatarEmoji: true,
+      createdAt: true,
+    },
   });
   return user ?? null;
 }
