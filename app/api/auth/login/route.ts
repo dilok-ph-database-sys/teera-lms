@@ -60,6 +60,9 @@ export async function POST(req: Request) {
     });
   }
 
+  // บันทึกการเข้าใช้งาน (ใช้ในหน้าผู้ดูแล) — ถ้าบันทึกไม่ได้ก็ไม่ขวางการล็อกอิน
+  await prisma.loginEvent.create({ data: { userId: user.id, method: "PASSWORD" } }).catch(() => {});
+
   const res = NextResponse.json({ data: { id: user.id, role: user.role } });
   res.cookies.set("uid", user.id, {
     httpOnly: true,
