@@ -19,6 +19,7 @@ const DEMO_PASSWORDS = {
 
 async function seed() {
   // ล้างของเดิม (เรียงตาม FK)
+  await db.loginEvent.deleteMany();
   await db.lessonProgress.deleteMany();
   await db.certificate.deleteMany();
   await db.enrollment.deleteMany();
@@ -43,7 +44,7 @@ async function seed() {
   // ── คอร์ส 1: Next.js (มีบทเรียนเต็ม + ผู้เรียนคนนี้กำลังเรียน) ──
   const next = await db.course.create({
     data: {
-      slug: "nextjs-foundation", title: "พื้นฐาน Next.js สร้างเว็บสมัยใหม่",
+      slug: "nextjs-foundation", title: "พื้นฐาน Next.js สร้างเว็บสมัยใหม่", category: "เขียนโปรแกรม",
       subtitle: "เรียนรู้ App Router, Server Components และการเชื่อมฐานข้อมูล ตั้งแต่ศูนย์จนขึ้นโปรดักชัน",
       icon: "⚡", gradient: "from-orange-500 to-amber-600", instructorName: "อ.สมชาย วงศ์",
       level: "ระดับต้น", priceCents: 129000, totalLessons: 6, totalHours: 9,
@@ -79,7 +80,7 @@ async function seed() {
   // ── คอร์ส 2: ฟรี ──
   await db.course.create({
     data: {
-      slug: "git-github", title: "Git & GitHub สำหรับทำงานเป็นทีม",
+      slug: "git-github", title: "Git & GitHub สำหรับทำงานเป็นทีม", category: "เครื่องมือนักพัฒนา",
       subtitle: "จัดการเวอร์ชันโค้ดและทำงานร่วมกันอย่างมือโปร",
       icon: "🌿", gradient: "from-orange-500 to-amber-600", instructorName: "อ.สมชาย วงศ์",
       level: "ระดับต้น", priceCents: 0, totalLessons: 3, totalHours: 5,
@@ -95,7 +96,7 @@ async function seed() {
   // ── คอร์ส 3: เสียเงิน (ยังไม่ซื้อ — ไว้ทดสอบ checkout) ──
   await db.course.create({
     data: {
-      slug: "postgresql-dev", title: "PostgreSQL สำหรับนักพัฒนา",
+      slug: "postgresql-dev", title: "PostgreSQL สำหรับนักพัฒนา", category: "ฐานข้อมูล",
       subtitle: "ออกแบบตาราง เขียน query ให้เร็ว และใช้ index อย่างเข้าใจ",
       icon: "🐘", gradient: "from-blue-500 to-indigo-600", instructorName: "อ.วิภา การุณ",
       level: "ระดับกลาง", priceCents: 159000, totalLessons: 3, totalHours: 11,
