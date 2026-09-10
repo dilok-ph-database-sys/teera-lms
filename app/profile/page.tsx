@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Loader2, AlertCircle, CheckCircle2, Mail, User2, Phone, Pencil, Camera, Trash2,
+  Loader2, AlertCircle, CheckCircle2, Mail, User2, Phone, Pencil, Camera, Trash2, KeyRound,
 } from "lucide-react";
 
 type Profile = {
@@ -94,6 +94,14 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState<string>("");   // "" = ไม่มีรูป (ใช้อีโมจิ)
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // ── เปลี่ยนรหัสผ่าน ──
+  const [curPw, setCurPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [newPw2, setNewPw2] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSaved, setPwSaved] = useState(false);
+
   const showBio = !ROLES_WITHOUT_BIO.includes(profile?.role ?? "");
 
   // โหลดข้อมูลปัจจุบัน
@@ -164,6 +172,31 @@ export default function ProfilePage() {
       setError(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwError(null); setPwSaved(false);
+
+    if (newPw !== newPw2) { setPwError("รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน"); return; }
+    if (newPw.length < 8)  { setPwError("รหัสผ่านใหม่ต้องยาวอย่างน้อย 8 ตัวอักษร"); return; }
+
+    setPwSaving(true);
+    try {
+      const res = await fetch("/api/auth/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: curPw, newPassword: newPw }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error?.message ?? "เปลี่ยนรหัสผ่านไม่สำเร็จ");
+      setPwSaved(true);
+      setCurPw(""); setNewPw(""); setNewPw2("");
+    } catch (err) {
+      setPwError(err instanceof Error ? err.message : "เปลี่ยนรหัสผ่านไม่สำเร็จ");
+    } finally {
+      setPwSaving(false);
     }
   }
 
@@ -361,6 +394,78 @@ export default function ProfilePage() {
             กลับแดชบอร์ด
           </Link>
         </div>
+      </form>
+
+      {/* ── การ์ดเปลี่ยนรหัสผ่าน ── */}
+      <form onSubmit={changePassword} className="mt-6 rounded-[28px] bg-white p-7 shadow-card sm:p-9">
+        <h2 className="flex items-center gap-2 font-display text-xl font-extrabold">
+          <KeyRound className="h-5 w-5 text-brand" /> เปลี่ยนรหัสผ่าน
+        </h2>
+        <p className="mt-1 text-sm text-ink/55">
+          รหัสผ่านจะถูกเข้ารหัสก่อนเก็บลงฐานข้อมูลเสมอ — ไม่มีใครเห็นรหัสจริงของคุณได้
+        </p>
+
+        <div className="mt-5">
+          <label className="mb-2 block text-sm font-bold text-ink/70">รหัสผ่านเดิม</label>
+          <input
+            type="password"
+            value={curPw}
+            onChange={(e) => setCurPw(e.target.value)}
+            className={inputCls}
+            placeholder="ถ้าเพิ่งเริ่มใช้และยังไม่เคยตั้ง ให้เว้นว่างไว้"
+            autoComplete="current-password"
+          />
+        </div>
+
+        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-bold text-ink/70">รหัสผ่านใหม่</label>
+            <input
+              type="password"
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+              className={inputCls}
+              placeholder="อย่างน้อย 8 ตัวอักษร"
+              autoComplete="new-password"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-bold text-ink/70">ยืนยันรหัสผ่านใหม่</label>
+            <div className="relative">
+              <input
+                type="password"
+                value={newPw2}
+                onChange={(e) => setNewPw2(e.target.value)}
+                className={inputCls}
+                placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง"
+                autoComplete="new-password"
+              />
+              {newPw2.length > 0 && newPw2 === newPw && (
+                <CheckCircle2 className="pointer-events-none absolute right-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-green-500" />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {pwError && (
+          <p className="mt-4 flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-600">
+            <AlertCircle className="h-4 w-4 flex-none" />{pwError}
+          </p>
+        )}
+        {pwSaved && (
+          <p className="mt-4 flex items-center gap-2 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-700">
+            <CheckCircle2 className="h-4 w-4 flex-none" />เปลี่ยนรหัสผ่านเรียบร้อยแล้ว — ครั้งหน้าใช้รหัสใหม่เข้าสู่ระบบ
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={pwSaving}
+          className="mt-7 inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-7 py-3 font-bold text-white shadow-soft transition hover:bg-brand-dark disabled:opacity-60"
+        >
+          {pwSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+          เปลี่ยนรหัสผ่าน
+        </button>
       </form>
     </main>
   );
