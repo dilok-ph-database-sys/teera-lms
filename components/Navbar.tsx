@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { Settings } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 
 /** ชื่อบทบาทเป็นภาษาไทย */
@@ -45,6 +46,18 @@ export async function Navbar() {
         <div className="ml-auto flex items-center gap-2">
           {user ? (
             <>
+              {/* ⚙️ ตั้งค่าระบบ — เห็นเฉพาะผู้ดูแลระบบ */}
+              {user.role === "ADMIN" && (
+                <Link
+                  href="/admin"
+                  title="ตั้งค่าระบบ (ผู้ดูแล)"
+                  aria-label="ตั้งค่าระบบ"
+                  className="group grid h-11 w-11 place-items-center rounded-full border border-orange-200 bg-white text-ink/60 transition hover:border-brand hover:bg-orange-50 hover:text-brand"
+                >
+                  <Settings className="h-5 w-5 transition-transform duration-500 group-hover:rotate-90" />
+                </Link>
+              )}
+
               {/* ข้อมูลส่วนตัว */}
               <Link
                 href="/profile"
