@@ -1,8 +1,8 @@
 // prisma/schema.prisma
 // เวอร์ชัน DEPLOY: ใช้ PostgreSQL (สำหรับ Vercel + Neon)
-//   DATABASE_URL = connection แบบ pooled (ใช้ตอนแอปรัน)
-//   DIRECT_URL   = connection แบบ non-pooling (ใช้ตอน migrate / seed)
-//   ถ้ามี URL เดียว ให้ใส่ค่าเดียวกันทั้งสองตัวได้
+//   DATABASE_URL          = connection แบบ pooled (ใช้ตอนแอปรัน)
+//   DATABASE_URL_UNPOOLED = connection แบบ non-pooling (ใช้ตอน migrate / seed)
+// ทั้งสองตัวนี้ Vercel + Neon ใส่ให้อัตโนมัติตอนกด Connect — ไม่ต้องพิมพ์เอง
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,7 +10,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model User {
