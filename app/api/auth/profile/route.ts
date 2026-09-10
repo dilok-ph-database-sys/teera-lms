@@ -31,7 +31,17 @@ const PatchSchema = z.object({
     .or(z.literal("")),
   bio: z.string().trim().max(300, "แนะนำตัวได้ไม่เกิน 300 ตัวอักษร").optional().or(z.literal("")),
   avatarEmoji: z.string().trim().min(1).max(8).optional(),
+  // รูปที่อัปโหลด — ต้องเป็น data URL ของรูปภาพ และย่อขนาดมาแล้วจากฝั่งเบราว์เซอร์
+  // ส่ง "" มา = ลบรูปออก (กลับไปใช้อีโมจิ)
+  avatarUrl: z
+    .string()
+    .max(900_000, "ไฟล์รูปใหญ่เกินไป กรุณาเลือกรูปที่เล็กลง")
+    .refine((v) => v === "" || /^data:image\/(png|jpeg|webp);base64,/.test(v), "รองรับเฉพาะไฟล์รูปภาพ")
+    .optional(),
 });
+
+/** บทบาทที่ไม่ต้องมีช่องแนะนำตัว */
+const ROLES_WITHOUT_BIO = ["ADMIN"];
 
 export async function PATCH(req: Request) {
   const current = await getCurrentUser();
@@ -45,19 +55,24 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const { fullName, phone, bio, avatarEmoji } = parsed.data;
+  const { fullName, phone, bio, avatarEmoji, avatarUrl } = parsed.data;
+
+  // แอดมินไม่มีช่องแนะนำตัว — บังคับให้ว่างเสมอ กันการส่งค่ามาตรง ๆ
+  const skipBio = ROLES_WITHOUT_BIO.includes(current.role);
 
   const user = await prisma.user.update({
     where: { id: current.id },
     data: {
       fullName,
       phone: phone ? phone : null,
-      bio: bio ? bio : null,
+      bio: skipBio ? null : bio ? bio : null,
       ...(avatarEmoji ? { avatarEmoji } : {}),
+      // undefined = ไม่แตะต้องของเดิม / "" = ลบรูปออก
+      ...(avatarUrl === undefined ? {} : { avatarUrl: avatarUrl === "" ? null : avatarUrl }),
     },
     select: {
       id: true, email: true, fullName: true, role: true,
-      phone: true, bio: true, avatarEmoji: true, createdAt: true,
+      phone: true, bio: true, avatarEmoji: true, avatarUrl: true, createdAt: true,
     },
   });
 
