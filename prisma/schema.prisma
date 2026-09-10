@@ -31,6 +31,7 @@ model User {
 
   enrollments Enrollment[]
   orders      Order[]
+  loginEvents LoginEvent[]
 }
 
 model Course {
@@ -38,6 +39,7 @@ model Course {
   slug           String   @unique
   title          String
   subtitle       String
+  category       String   @default("ทั่วไป") // หมวดวิชา — ใช้จัดกลุ่มในหน้าคอร์ส
   icon           String   @default("📘")
   gradient       String   @default("from-orange-500 to-amber-600")
   instructorName String
@@ -144,4 +146,17 @@ model Payment {
   status      String   @default("PENDING") // PENDING | SUCCEEDED | FAILED
   paidAt      DateTime?
   order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+/// บันทึกการเข้าใช้งาน — ใช้ในหน้าผู้ดูแล "ตรวจสอบการเข้าใช้งาน"
+model LoginEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  method    String   @default("PASSWORD") // PASSWORD | SIGNUP | DEV
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }
