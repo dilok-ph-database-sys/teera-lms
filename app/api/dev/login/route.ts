@@ -26,6 +26,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "ยังไม่มีข้อมูล seed — รัน npm run db:seed ก่อน" }, { status: 404 });
   }
 
+  await prisma.loginEvent.create({ data: { userId: user.id, method: "DEV" } }).catch(() => {});
+
   const res = NextResponse.json({ data: { id: user.id, role: user.role } });
   res.cookies.set("uid", uid, { httpOnly: true, path: "/", sameSite: "lax" });
   return res;
