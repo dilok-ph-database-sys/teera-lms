@@ -112,7 +112,7 @@ export function AuthCard({ mode, next }: { mode: Mode; next?: string }) {
         </div>
         <div className="relative">
           <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-orange-300" />
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="รหัสผ่าน" className={inputCls} />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={isLogin ? "รหัสผ่าน" : "รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)"} className={inputCls} autoComplete={isLogin ? "current-password" : "new-password"} />
         </div>
 
         {/* ยืนยันรหัสผ่าน — เฉพาะหน้าสมัคร */}
