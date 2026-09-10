@@ -18,6 +18,7 @@ export interface AppUser {
   phone: string | null;
   bio: string | null;
   avatarEmoji: string;
+  avatarUrl: string | null;
   createdAt: Date;
 }
 
@@ -35,6 +36,7 @@ export async function getCurrentUser(): Promise<AppUser | null> {
       phone: true,
       bio: true,
       avatarEmoji: true,
+      avatarUrl: true,
       createdAt: true,
     },
   });
