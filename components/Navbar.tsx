@@ -51,8 +51,14 @@ export async function Navbar() {
                 className="flex items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-orange-100/70"
                 title="ดู / แก้ไขข้อมูลส่วนตัว"
               >
-                <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-sun to-brand text-lg shadow-soft">
-                  {user.avatarEmoji ?? "🙂"}
+                <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-sun to-brand text-lg shadow-soft">
+                  {user.avatarUrl ? (
+                    /* รูปที่ผู้ใช้อัปโหลด — ครอปให้เต็มวงกลมพอดี ไม่ยืดผิดสัดส่วน */
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    user.avatarEmoji ?? "🙂"
+                  )}
                 </span>
                 <span className="hidden text-left leading-tight sm:block">
                   <span className="block text-[14px] font-bold">{user.fullName}</span>
