@@ -1,10 +1,12 @@
 // app/api/auth/profile/route.ts — อ่าน / แก้ไขข้อมูลส่วนตัวของผู้ใช้ที่ล็อกอินอยู่
 //   GET   → ดึงข้อมูลปัจจุบัน
 //   PATCH → บันทึกข้อมูลที่แก้ไข
+//   PUT   → เปลี่ยนรหัสผ่าน
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { hashPassword, verifyPassword, MIN_PASSWORD_LENGTH } from "@/lib/password";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -77,4 +79,53 @@ export async function PATCH(req: Request) {
   });
 
   return NextResponse.json({ data: user });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT — เปลี่ยนรหัสผ่าน
+// ─────────────────────────────────────────────────────────────────────────────
+const PasswordSchema = z.object({
+  currentPassword: z.string().optional().or(z.literal("")),
+  newPassword: z
+    .string()
+    .min(MIN_PASSWORD_LENGTH, `รหัสผ่านใหม่ต้องยาวอย่างน้อย ${MIN_PASSWORD_LENGTH} ตัวอักษร`)
+    .max(72, "รหัสผ่านยาวเกินไป"),
+});
+
+export async function PUT(req: Request) {
+  const current = await getCurrentUser();
+  if (!current) return UNAUTHORIZED;
+
+  const parsed = PasswordSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" } },
+      { status: 422 },
+    );
+  }
+  const { currentPassword, newPassword } = parsed.data;
+
+  // อ่าน hash ปัจจุบันแยกต่างหาก — ไม่เอาไปปนกับข้อมูลที่ส่งกลับหน้าเว็บ
+  const row = await prisma.user.findUnique({
+    where: { id: current.id },
+    select: { passwordHash: true },
+  });
+
+  // ถ้ามีรหัสผ่านอยู่แล้ว ต้องยืนยันรหัสเดิมก่อนถึงจะเปลี่ยนได้
+  if (row?.passwordHash) {
+    const ok = await verifyPassword(currentPassword ?? "", row.passwordHash);
+    if (!ok) {
+      return NextResponse.json(
+        { error: { code: "WRONG_PASSWORD", message: "รหัสผ่านเดิมไม่ถูกต้อง" } },
+        { status: 401 },
+      );
+    }
+  }
+
+  await prisma.user.update({
+    where: { id: current.id },
+    data: { passwordHash: await hashPassword(newPassword) },
+  });
+
+  return NextResponse.json({ data: { ok: true } });
 }
