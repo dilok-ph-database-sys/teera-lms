@@ -1,0 +1,20 @@
+@import url("https://fonts.googleapis.com/css2?family=Baloo+Thai+2:wght@500;600;700;800&family=Sarabun:wght@400;500;600;700&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+
+body {
+  font-family: "Sarabun", ui-sans-serif, system-ui, sans-serif;
+  background: #FFF7ED; /* cream */
+  color: #3A2A1A;      /* warm ink */
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: "Baloo Thai 2", ui-sans-serif, system-ui, sans-serif;
+}
+
+@keyframes floaty { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-12px) } }
+.animate-floaty { animation: floaty 5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .animate-floaty { animation: none } }

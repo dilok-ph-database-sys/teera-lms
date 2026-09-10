@@ -1,0 +1,135 @@
+// prisma/schema.prisma
+// เวอร์ชัน DEV: ใช้ SQLite เพื่อให้รันบนเครื่องได้ทันที
+// DATABASE_URL=file:./dev.db
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  fullName  String
+  role      String   @default("STUDENT") // ADMIN | INSTRUCTOR | STUDENT
+  createdAt DateTime @default(now())
+
+  enrollments Enrollment[]
+  orders      Order[]
+}
+
+model Course {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  subtitle       String
+  icon           String   @default("📘")
+  gradient       String   @default("from-orange-500 to-amber-600")
+  instructorName String
+  level          String   @default("BEGINNER")
+  priceCents     Int      @default(0)
+  currency       String   @default("THB")
+  status         String   @default("PUBLISHED") // DRAFT | PUBLISHED
+  totalLessons   Int      @default(0)
+  totalHours     Int      @default(0)
+  ratingAvg      Float    @default(0)
+  ratingCount    Int      @default(0)
+  studentCount   Int      @default(0)
+
+  modules     Module[]
+  enrollments Enrollment[]
+}
+
+model Module {
+  id       String   @id @default(cuid())
+  courseId String
+  title    String
+  position Int
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons  Lesson[]
+}
+
+model Lesson {
+  id          String  @id @default(cuid())
+  moduleId    String
+  title       String
+  type        String  @default("VIDEO") // VIDEO | ARTICLE | FILE | QUIZ
+  videoUrl    String?
+  videoKind   String? // hls | mp4 | embed
+  overviewHtml String?
+  durationSec Int     @default(0)
+  position    Int
+  isPreview   Boolean @default(false)
+
+  module   Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress LessonProgress[]
+}
+
+model Enrollment {
+  id              String    @id @default(cuid())
+  userId          String
+  courseId        String
+  orderId         String?
+  status          String    @default("ACTIVE") // ACTIVE | COMPLETED | CANCELLED | EXPIRED
+  progressPercent Int       @default(0)
+  enrolledAt      DateTime  @default(now())
+  completedAt     DateTime?
+  expiresAt       DateTime?
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course      Course           @relation(fields: [courseId], references: [id])
+  progress    LessonProgress[]
+  certificate Certificate?
+
+  @@unique([userId, courseId])
+}
+
+model LessonProgress {
+  id              String    @id @default(cuid())
+  enrollmentId    String
+  lessonId        String
+  isCompleted     Boolean   @default(false)
+  lastPositionSec Int       @default(0)
+  completedAt     DateTime?
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson     Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+}
+
+model Certificate {
+  id           String   @id @default(cuid())
+  enrollmentId String   @unique
+  serial       String   @unique
+  pdfUrl       String?
+  issuedAt     DateTime @default(now())
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  orderNo     String   @unique
+  userId      String
+  totalCents  Int
+  currency    String   @default("THB")
+  status      String   @default("PENDING") // PENDING | PAID | FAILED
+  createdAt   DateTime @default(now())
+  paidAt      DateTime?
+  user        User      @relation(fields: [userId], references: [id])
+  payments    Payment[]
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  orderId     String
+  provider    String   // STRIPE | PROMPTPAY | DEV
+  providerRef String   @unique
+  amountCents Int
+  status      String   @default("PENDING") // PENDING | SUCCEEDED | FAILED
+  paidAt      DateTime?
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
