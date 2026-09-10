@@ -1,13 +1,16 @@
 // prisma/schema.prisma
-// เวอร์ชัน DEV: ใช้ SQLite เพื่อให้รันบนเครื่องได้ทันที
-// DATABASE_URL=file:./dev.db
+// เวอร์ชัน DEPLOY: ใช้ PostgreSQL (สำหรับ Vercel + Neon)
+//   DATABASE_URL = connection แบบ pooled (ใช้ตอนแอปรัน)
+//   DIRECT_URL   = connection แบบ non-pooling (ใช้ตอน migrate / seed)
+//   ถ้ามี URL เดียว ให้ใส่ค่าเดียวกันทั้งสองตัวได้
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
