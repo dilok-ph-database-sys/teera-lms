@@ -173,15 +173,18 @@ export function AuthCard({ mode, next }: { mode: Mode; next?: string }) {
         )}
       </div>
 
-      {/* บัญชีทดลอง (เฉพาะหน้าเข้าสู่ระบบ) */}
+      {/* บัญชีทดลอง (เฉพาะหน้าเข้าสู่ระบบ)
+          เปิดให้ทดลองเฉพาะบทบาท "นักเรียน" เท่านั้น
+          บัญชีผู้สอน/แอดมินต้องเข้าด้วยอีเมล–รหัสผ่านจริง ไม่เปิดให้กดทดลองหน้าเว็บ */}
       {isLogin && (
         <div className="mt-5">
           <div className="mb-2 text-center text-xs text-ink/45">— หรือลองด้วยบัญชีทดลอง —</div>
-          <div className="grid grid-cols-3 gap-2">
-            <button onClick={() => demo("student")} className="rounded-xl border border-orange-200 py-2 text-sm font-semibold hover:bg-orange-50">นักเรียน</button>
-            <button onClick={() => demo("instructor")} className="rounded-xl border border-orange-200 py-2 text-sm font-semibold hover:bg-orange-50">ผู้สอน</button>
-            <button onClick={() => demo("admin")} className="rounded-xl border border-orange-200 py-2 text-sm font-semibold hover:bg-orange-50">แอดมิน</button>
-          </div>
+          <button
+            onClick={() => demo("student")}
+            className="w-full rounded-xl border border-orange-200 py-2.5 text-sm font-semibold transition hover:bg-orange-50"
+          >
+            เข้าสู่ระบบเป็น “นักเรียน” (บัญชีทดลอง)
+          </button>
         </div>
       )}
     </div>
