@@ -24,13 +24,10 @@ function VideoPlayer({ lesson, onEnded }: { lesson: Lesson; onEnded?: () => void
   useEffect(() => {
     const v = ref.current;
     if (!v || lesson.videoKind !== "hls" || !lesson.videoUrl) return;
-    if (v.canPlayType("application/vnd.apple.mpegurl")) { v.src = lesson.videoUrl; return; }
-    let cancelled = false; let hls: any;
-    import("hls.js" as any).then(({ default: Hls }) => {
-      if (cancelled || !Hls.isSupported()) return;
-      hls = new Hls(); hls.loadSource(lesson.videoUrl!); hls.attachMedia(v);
-    }).catch(() => {});
-    return () => { cancelled = true; hls?.destroy?.(); };
+    // เบราว์เซอร์ที่รองรับ HLS ในตัว (Safari / iOS) เล่นได้เลย
+    if (v.canPlayType("application/vnd.apple.mpegurl")) v.src = lesson.videoUrl;
+    // ถ้าต้องรองรับ HLS บนเบราว์เซอร์อื่นด้วย: ติดตั้งเพิ่ม `npm i hls.js`
+    // แล้วค่อยเพิ่มโค้ดโหลด hls.js ตรงนี้ (ตอนนี้วิดีโอตัวอย่างเป็น mp4 จึงยังไม่จำเป็น)
   }, [lesson.videoUrl, lesson.videoKind]);
 
   if (lesson.videoKind === "embed" && lesson.videoUrl)
