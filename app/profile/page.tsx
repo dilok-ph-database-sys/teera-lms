@@ -1,9 +1,14 @@
 // app/profile/page.tsx — หน้าข้อมูลส่วนตัว (ดู + แก้ไข)
+//  • อัปโหลดรูปโปรไฟล์ได้จริง — ครอปเป็นสี่เหลี่ยมจัตุรัสและย่อเหลือ 256px อัตโนมัติ
+//  • ถ้าไม่มีรูป จะใช้อีโมจิที่เลือกไว้แทน
+//  • บทบาท "ผู้ดูแลระบบ" จะไม่มีช่องแนะนำตัว
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2, AlertCircle, CheckCircle2, Mail, User2, Phone, Pencil } from "lucide-react";
+import {
+  Loader2, AlertCircle, CheckCircle2, Mail, User2, Phone, Pencil, Camera, Trash2,
+} from "lucide-react";
 
 type Profile = {
   id: string;
@@ -13,6 +18,7 @@ type Profile = {
   phone: string | null;
   bio: string | null;
   avatarEmoji: string;
+  avatarUrl: string | null;
   createdAt: string;
 };
 
@@ -22,8 +28,56 @@ const ROLE_TH: Record<string, string> = {
   STUDENT: "นักเรียน",
 };
 
-/** อีโมจิให้เลือกเป็นรูปโปรไฟล์ */
+/** บทบาทที่ไม่ต้องแสดงช่องแนะนำตัว */
+const ROLES_WITHOUT_BIO = ["ADMIN"];
+
+/** อีโมจิสำรอง ใช้เมื่อยังไม่ได้อัปโหลดรูป */
 const EMOJIS = ["🙂", "😎", "🐱", "🐶", "🦊", "🐼", "🦁", "🐧", "🌟", "🎈", "🚀", "📚"];
+
+/** ขนาดรูปที่เก็บจริง (พิกเซล) — เล็กพอให้โหลดไว แต่ยังคมบนจอ Retina */
+const AVATAR_SIZE = 256;
+const MAX_INPUT_BYTES = 8 * 1024 * 1024; // รับไฟล์ต้นฉบับไม่เกิน 8 MB
+
+/**
+ * ย่อ + ครอปรูปให้เป็นสี่เหลี่ยมจัตุรัสตรงกลาง แล้วคืนเป็น data URL (JPEG)
+ * ทำฝั่งเบราว์เซอร์ทั้งหมด — ไม่ต้องใช้บริการเก็บไฟล์ภายนอก
+ */
+function fileToSquareDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("อ่านไฟล์ไม่สำเร็จ"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("ไฟล์นี้ไม่ใช่รูปภาพที่เปิดได้"));
+      img.onload = () => {
+        // ครอปตรงกลางให้เป็นจัตุรัส (รูปแนวนอน/แนวตั้งก็พอดีวงกลมเสมอ)
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = (img.height - side) / 2;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = AVATAR_SIZE;
+        canvas.height = AVATAR_SIZE;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("เบราว์เซอร์ไม่รองรับการย่อรูป"));
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, AVATAR_SIZE, AVATAR_SIZE);
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
+
+        // ลดคุณภาพลงทีละขั้นจนไฟล์เล็กพอ
+        let quality = 0.85;
+        let out = canvas.toDataURL("image/jpeg", quality);
+        while (out.length > 700_000 && quality > 0.4) {
+          quality -= 0.15;
+          out = canvas.toDataURL("image/jpeg", quality);
+        }
+        resolve(out);
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
@@ -37,6 +91,10 @@ export default function ProfilePage() {
   const [phone, setPhone] = useState("");
   const [bio, setBio] = useState("");
   const [avatarEmoji, setAvatarEmoji] = useState("🙂");
+  const [avatarUrl, setAvatarUrl] = useState<string>("");   // "" = ไม่มีรูป (ใช้อีโมจิ)
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const showBio = !ROLES_WITHOUT_BIO.includes(profile?.role ?? "");
 
   // โหลดข้อมูลปัจจุบัน
   useEffect(() => {
@@ -51,6 +109,7 @@ export default function ProfilePage() {
         setPhone(p.phone ?? "");
         setBio(p.bio ?? "");
         setAvatarEmoji(p.avatarEmoji ?? "🙂");
+        setAvatarUrl(p.avatarUrl ?? "");
       } catch {
         setError("โหลดข้อมูลไม่สำเร็จ ลองรีเฟรชหน้าอีกครั้ง");
       } finally {
@@ -59,6 +118,27 @@ export default function ProfilePage() {
     })();
   }, []);
 
+  async function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // ให้เลือกไฟล์เดิมซ้ำได้
+    if (!file) return;
+
+    setError(null); setSaved(false);
+    if (!file.type.startsWith("image/")) {
+      setError("กรุณาเลือกไฟล์รูปภาพ (JPG, PNG หรือ WebP)");
+      return;
+    }
+    if (file.size > MAX_INPUT_BYTES) {
+      setError("ไฟล์ใหญ่เกิน 8 MB กรุณาเลือกรูปที่เล็กลง");
+      return;
+    }
+    try {
+      setAvatarUrl(await fileToSquareDataUrl(file));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "เปิดไฟล์รูปไม่สำเร็จ");
+    }
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setError(null); setSaved(false); setSaving(true);
@@ -66,7 +146,13 @@ export default function ProfilePage() {
       const res = await fetch("/api/auth/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, phone, bio, avatarEmoji }),
+        body: JSON.stringify({
+          fullName,
+          phone,
+          bio: showBio ? bio : "",
+          avatarEmoji,
+          avatarUrl,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error?.message ?? "บันทึกไม่สำเร็จ");
@@ -117,8 +203,11 @@ export default function ProfilePage() {
 
       {/* การ์ดสรุป */}
       <div className="mt-6 flex items-center gap-4 rounded-[28px] bg-gradient-to-br from-brand to-sun p-6 text-white shadow-card">
-        <span className="grid h-20 w-20 shrink-0 place-items-center rounded-3xl bg-white/25 text-5xl backdrop-blur">
-          {avatarEmoji}
+        <span className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-white/25 text-5xl ring-4 ring-white/40 backdrop-blur">
+          {avatarUrl
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={avatarUrl} alt="รูปโปรไฟล์" className="h-full w-full object-cover" />
+            : avatarEmoji}
         </span>
         <div className="min-w-0">
           <p className="truncate font-display text-2xl font-extrabold">{profile?.fullName}</p>
@@ -135,29 +224,78 @@ export default function ProfilePage() {
           <Pencil className="h-5 w-5 text-brand" /> แก้ไขข้อมูล
         </h2>
 
-        {/* เลือกรูปโปรไฟล์ */}
+        {/* ── รูปโปรไฟล์ ── */}
         <div className="mt-6">
-          <label className="mb-2 block text-sm font-bold text-ink/70">รูปโปรไฟล์</label>
-          <div className="flex flex-wrap gap-2">
-            {EMOJIS.map((e) => (
+          <label className="mb-3 block text-sm font-bold text-ink/70">รูปโปรไฟล์</label>
+
+          <div className="flex flex-wrap items-center gap-5">
+            {/* ตัวอย่างรูป */}
+            <span className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full bg-orange-100 text-5xl ring-4 ring-orange-200">
+              {avatarUrl
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={avatarUrl} alt="ตัวอย่างรูปโปรไฟล์" className="h-full w-full object-cover" />
+                : avatarEmoji}
+            </span>
+
+            <div className="flex flex-col gap-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={pickImage}
+                className="hidden"
+              />
               <button
-                key={e}
                 type="button"
-                onClick={() => setAvatarEmoji(e)}
-                className={`grid h-12 w-12 place-items-center rounded-2xl text-2xl transition ${
-                  avatarEmoji === e
-                    ? "bg-brand text-white shadow-soft ring-2 ring-brand ring-offset-2"
-                    : "bg-orange-50 hover:bg-orange-100"
-                }`}
+                onClick={() => fileRef.current?.click()}
+                className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 font-bold text-white shadow-soft transition hover:bg-brand-dark"
               >
-                {e}
+                <Camera className="h-4 w-4" />
+                {avatarUrl ? "เปลี่ยนรูป" : "อัปโหลดรูป"}
               </button>
-            ))}
+
+              {avatarUrl && (
+                <button
+                  type="button"
+                  onClick={() => setAvatarUrl("")}
+                  className="inline-flex items-center gap-2 rounded-xl border border-orange-200 px-5 py-2.5 text-sm font-bold text-ink/60 transition hover:bg-orange-50 hover:text-rose-600"
+                >
+                  <Trash2 className="h-4 w-4" /> ลบรูป (กลับไปใช้อีโมจิ)
+                </button>
+              )}
+
+              <p className="text-xs text-ink/45">
+                รองรับ JPG, PNG, WebP — ระบบจะครอปตรงกลางให้พอดีวงกลมอัตโนมัติ
+              </p>
+            </div>
           </div>
+
+          {/* เลือกอีโมจิ — ใช้เมื่อยังไม่มีรูป */}
+          {!avatarUrl && (
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-semibold text-ink/50">หรือเลือกอีโมจิแทนรูป</p>
+              <div className="flex flex-wrap gap-2">
+                {EMOJIS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => setAvatarEmoji(e)}
+                    className={`grid h-12 w-12 place-items-center rounded-2xl text-2xl transition ${
+                      avatarEmoji === e
+                        ? "bg-brand text-white shadow-soft ring-2 ring-brand ring-offset-2"
+                        : "bg-orange-50 hover:bg-orange-100"
+                    }`}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ชื่อ */}
-        <div className="mt-5">
+        <div className="mt-6">
           <label className="mb-2 flex items-center gap-2 text-sm font-bold text-ink/70">
             <User2 className="h-4 w-4 text-orange-400" /> ชื่อ–นามสกุล
           </label>
@@ -181,19 +319,21 @@ export default function ProfilePage() {
           <input value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} placeholder="เช่น 081-234-5678" />
         </div>
 
-        {/* แนะนำตัว */}
-        <div className="mt-5">
-          <label className="mb-2 block text-sm font-bold text-ink/70">แนะนำตัวสั้น ๆ</label>
-          <textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            rows={4}
-            maxLength={300}
-            className={`${inputCls} resize-none`}
-            placeholder="เล่าเกี่ยวกับตัวคุณ เช่น สนใจเรียนเรื่องอะไร ทำงานด้านไหน"
-          />
-          <p className="mt-1 text-right text-xs text-ink/45">{bio.length}/300</p>
-        </div>
+        {/* แนะนำตัว — ซ่อนสำหรับผู้ดูแลระบบ */}
+        {showBio && (
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-bold text-ink/70">แนะนำตัวสั้น ๆ</label>
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              rows={4}
+              maxLength={300}
+              className={`${inputCls} resize-none`}
+              placeholder="เล่าเกี่ยวกับตัวคุณ เช่น สนใจเรียนเรื่องอะไร ทำงานด้านไหน"
+            />
+            <p className="mt-1 text-right text-xs text-ink/45">{bio.length}/300</p>
+          </div>
+        )}
 
         {/* ข้อความแจ้งผล */}
         {error && (
