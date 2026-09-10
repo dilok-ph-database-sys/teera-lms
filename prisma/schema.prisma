@@ -26,6 +26,9 @@ model User {
   avatarEmoji String  @default("🙂")
   avatarUrl   String? // รูปโปรไฟล์ที่อัปโหลดเอง (เก็บเป็น data URL ย่อขนาดแล้ว)
 
+  // รหัสผ่านที่เข้ารหัสแล้ว (scrypt) — ห้ามเก็บรหัสผ่านจริง และห้ามส่งค่านี้ออกไปฝั่งเบราว์เซอร์
+  passwordHash String?
+
   enrollments Enrollment[]
   orders      Order[]
 }
