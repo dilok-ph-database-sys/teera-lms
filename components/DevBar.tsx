@@ -27,8 +27,10 @@ export function DevBar({ userName, role }: { userName: string | null; role: stri
         เข้าระบบเป็น: <b>{userName ? `${userName} (${role})` : "ยังไม่ล็อกอิน"}</b>
       </span>
       <span className="ml-auto flex gap-1">
-        {/* เหลือเฉพาะนักเรียน — ผู้สอน/แอดมินต้องเข้าผ่านหน้า /login ด้วยอีเมลจริง */}
+        {/* แถบนี้ไว้ทดสอบเท่านั้น — ก่อนเปิดให้คนนอกใช้จริง ให้ลบ <DevBar /> ออกจาก app/layout.tsx */}
         <button onClick={() => loginAs("student")} className="rounded bg-white px-2 py-1 ring-1 ring-amber-200 hover:bg-amber-100">นักเรียน</button>
+        <button onClick={() => loginAs("instructor")} className="rounded bg-white px-2 py-1 ring-1 ring-amber-200 hover:bg-amber-100">ผู้สอน</button>
+        <button onClick={() => loginAs("admin")} className="rounded bg-white px-2 py-1 ring-1 ring-amber-200 hover:bg-amber-100">แอดมิน</button>
         {userName && <button onClick={logout} className="rounded bg-white px-2 py-1 ring-1 ring-amber-200 hover:bg-amber-100">ออก</button>}
       </span>
     </div>
