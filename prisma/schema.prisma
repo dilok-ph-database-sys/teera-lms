@@ -24,6 +24,7 @@ model User {
   phone       String?
   bio         String?
   avatarEmoji String  @default("🙂")
+  avatarUrl   String? // รูปโปรไฟล์ที่อัปโหลดเอง (เก็บเป็น data URL ย่อขนาดแล้ว)
 
   enrollments Enrollment[]
   orders      Order[]
