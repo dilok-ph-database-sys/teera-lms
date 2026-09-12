@@ -1,14 +1,22 @@
-// app/dashboard/page.tsx — Student Dashboard (Server Component)
+// app/dashboard/page.tsx — แดชบอร์ด (Server Component)
+//   นักเรียน        → คอร์สที่เรียน / ความคืบหน้า / ใบรับรอง
+//   ผู้สอน & แอดมิน → ตารางงานรายวัน (คนละข้อความตามบทบาท)
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { StudentDashboard, type EnrolledCourse, type CertificateItem } from "@/components/StudentDashboard";
+import { StaffDashboard } from "@/components/StaffDashboard";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/dashboard");
+
+  // ผู้สอน / ผู้ดูแลระบบ ใช้แดชบอร์ดแบบตารางงาน
+  if (user.role === "INSTRUCTOR" || user.role === "ADMIN") {
+    return <StaffDashboard staffName={user.fullName} role={user.role} />;
+  }
 
   const enrollments = await prisma.enrollment.findMany({
     where: { userId: user.id, status: { in: ["ACTIVE", "COMPLETED"] } },
