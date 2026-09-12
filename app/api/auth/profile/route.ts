@@ -38,7 +38,10 @@ const PatchSchema = z.object({
   avatarUrl: z
     .string()
     .max(900_000, "ไฟล์รูปใหญ่เกินไป กรุณาเลือกรูปที่เล็กลง")
-    .refine((v) => v === "" || /^data:image\/(png|jpeg|webp);base64,/.test(v), "รองรับเฉพาะไฟล์รูปภาพ")
+    .refine(
+      (v) => v === "" || /^data:image\/(png|jpeg|webp);base64,/.test(v) || /^https:\/\//.test(v),
+      "รองรับเฉพาะไฟล์รูปภาพ",
+    )
     .optional(),
 });
 
