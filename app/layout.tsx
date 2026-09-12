@@ -15,7 +15,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="th">
       <body className="bg-cream text-ink">
-        <DevBar userName={user?.fullName ?? null} role={user?.role ?? null} />
+        {/* แถบ DEV แสดงเฉพาะตอน "ยังไม่ล็อกอิน" กับ "ผู้ดูแลระบบ" เท่านั้น
+            นักเรียนและผู้สอนจะไม่เห็นแถบนี้ */}
+        {(!user || user.role === "ADMIN") && (
+          <DevBar userName={user?.fullName ?? null} role={user?.role ?? null} />
+        )}
         <Navbar />
         {children}
         <Footer />
