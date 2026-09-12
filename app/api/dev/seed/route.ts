@@ -14,6 +14,7 @@ export const maxDuration = 60;
 const DEMO_PASSWORDS = {
   student: "student1234",
   instructor: "teacher1234",
+  instructor2: "wipa1234",
   admin: "admin1234",
 };
 
@@ -36,6 +37,13 @@ async function seed() {
   });
   await db.user.create({
     data: { id: "u_instructor", email: "teacher@teera.dev", fullName: "อ.สมชาย วงศ์", role: "INSTRUCTOR", passwordHash: await hashPassword(DEMO_PASSWORDS.instructor) },
+  });
+  await db.user.create({
+    data: {
+      id: "u_instructor2", email: "wipa@teera.dev", fullName: "อ.วิภา การุณ", role: "INSTRUCTOR",
+      bio: "สอน PostgreSQL และการออกแบบฐานข้อมูล",
+      passwordHash: await hashPassword(DEMO_PASSWORDS.instructor2),
+    },
   });
   await db.user.create({
     data: { id: "u_admin", email: "admin@teera.dev", fullName: "ธีรา ผู้ดูแล", role: "ADMIN", passwordHash: await hashPassword(DEMO_PASSWORDS.admin) },
@@ -129,7 +137,7 @@ async function seed() {
     data: { enrollmentId: gitEnroll.id, serial: "TEERA-2026-000042", pdfUrl: "#", issuedAt: new Date() },
   });
 
-  return { users: 3, courses: 3, enrollments: 2, certificates: 1 };
+  return { users: 4, courses: 3, enrollments: 2, certificates: 1 };
 }
 
 export async function GET() {
@@ -142,6 +150,7 @@ export async function GET() {
       accounts: [
         `นักเรียน — student@teera.dev / ${DEMO_PASSWORDS.student}`,
         `ผู้สอน  — teacher@teera.dev / ${DEMO_PASSWORDS.instructor}`,
+        `ผู้สอน  — wipa@teera.dev / ${DEMO_PASSWORDS.instructor2}`,
         `แอดมิน  — admin@teera.dev / ${DEMO_PASSWORDS.admin}`,
       ],
     });
