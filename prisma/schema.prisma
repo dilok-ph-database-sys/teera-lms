@@ -32,6 +32,7 @@ model User {
   enrollments Enrollment[]
   orders      Order[]
   loginEvents LoginEvent[]
+  schedule    ScheduleItem[]
 }
 
 model Course {
@@ -159,4 +160,22 @@ model LoginEvent {
 
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+/// ตารางงาน/ตารางสอนรายวัน — ผู้สอนและผู้ดูแลเพิ่ม–แก้ไขเองได้ที่หน้าแดชบอร์ด
+model ScheduleItem {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String   // "YYYY-MM-DD" — เก็บเป็นข้อความ อ่านง่ายและไม่เพี้ยนเรื่องโซนเวลา
+  startTime String   @default("09:00")
+  endTime   String   @default("10:00")
+  title     String
+  place     String?
+  note      String?
+  status    String   @default("PENDING") // PENDING = ยังไม่เสร็จ | DONE = เสร็จแล้ว
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
 }
