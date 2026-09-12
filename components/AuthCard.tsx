@@ -7,6 +7,17 @@ import { Loader2, Mail, Lock, User2, AlertCircle, Info, Check } from "lucide-rea
 
 type Mode = "login" | "signup";
 
+/** ข้อความอธิบาย error ที่ส่งกลับมาจากขั้นตอน Google (?error=...) */
+const GOOGLE_ERRORS: Record<string, string> = {
+  google_not_configured: "ยังไม่ได้ตั้งค่าการเข้าสู่ระบบด้วย Google — ผู้ดูแลระบบต้องใส่ GOOGLE_CLIENT_ID และ GOOGLE_CLIENT_SECRET ก่อน",
+  google_cancelled: "คุณยกเลิกการเข้าสู่ระบบด้วย Google",
+  google_no_code: "การเชื่อมต่อกับ Google ไม่สมบูรณ์ กรุณาลองใหม่อีกครั้ง",
+  google_state_mismatch: "การเชื่อมต่อหมดอายุ กรุณากดปุ่ม Google ใหม่อีกครั้ง",
+  google_token_failed: "แลกข้อมูลกับ Google ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+  google_bad_token: "ข้อมูลจาก Google ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง",
+  google_email_unverified: "อีเมล Google นี้ยังไม่ได้ยืนยัน กรุณายืนยันอีเมลกับ Google ก่อน",
+};
+
 /** โลโก้ Google สำหรับปุ่ม (ใช้บนปุ่ม "เข้าสู่ระบบด้วย Google") */
 function GoogleIcon() {
   return (
@@ -16,7 +27,7 @@ function GoogleIcon() {
   );
 }
 
-export function AuthCard({ mode, next }: { mode: Mode; next?: string }) {
+export function AuthCard({ mode, next, oauthError }: { mode: Mode; next?: string; oauthError?: string }) {
   const isLogin = mode === "login";
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -24,7 +35,9 @@ export function AuthCard({ mode, next }: { mode: Mode; next?: string }) {
   const [confirm, setConfirm] = useState("");   // ยืนยันรหัสผ่าน (หน้าสมัคร)
   const [remember, setRemember] = useState(true); // จำฉันไว้ (หน้าเข้าสู่ระบบ)
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    oauthError ? GOOGLE_ERRORS[oauthError] ?? "เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" : null,
+  );
   const [info, setInfo] = useState<string | null>(null);
 
   const go = next && next.startsWith("/") ? next : "/dashboard";
@@ -65,13 +78,6 @@ export function AuthCard({ mode, next }: { mode: Mode; next?: string }) {
     window.location.href = go;
   }
 
-  function googleLogin() {
-    // ตอนขึ้นจริง: เรียก Supabase OAuth เช่น
-    //   supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: go } })
-    setError(null);
-    setInfo("การเข้าสู่ระบบด้วย Google จะใช้งานได้เมื่อเชื่อม Supabase OAuth ในโปรดักชัน (โหมด dev นี้ยังไม่เปิด)");
-  }
-
   const inputCls =
     "w-full rounded-xl border border-orange-200 bg-orange-50/40 pl-11 pr-4 py-3 text-[15px] outline-none focus:border-brand focus:bg-white";
 
@@ -85,15 +91,14 @@ export function AuthCard({ mode, next }: { mode: Mode; next?: string }) {
         </p>
       </div>
 
-      {/* ปุ่ม Google */}
-      <button
-        type="button"
-        onClick={googleLogin}
+      {/* ปุ่ม Google — พาไปหน้ายินยอมของ Google จริง */}
+      <a
+        href={`/api/auth/google?next=${encodeURIComponent(go)}`}
         className="flex w-full items-center justify-center gap-3 rounded-xl border border-orange-200 bg-white py-3 text-[15px] font-semibold text-ink/80 transition hover:bg-orange-50"
       >
         <GoogleIcon />
         {isLogin ? "เข้าสู่ระบบด้วย Google" : "สมัครด้วย Google"}
-      </button>
+      </a>
 
       <div className="my-4 flex items-center gap-3 text-xs text-ink/40">
         <span className="h-px flex-1 bg-orange-100" />หรือใช้อีเมล<span className="h-px flex-1 bg-orange-100" />
