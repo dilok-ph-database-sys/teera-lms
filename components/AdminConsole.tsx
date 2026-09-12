@@ -42,7 +42,7 @@ type AdminData = {
 };
 
 const ROLE_TH: Record<string, string> = { ADMIN: "ผู้ดูแลระบบ", INSTRUCTOR: "ผู้สอน", STUDENT: "นักเรียน" };
-const METHOD_TH: Record<string, string> = { PASSWORD: "รหัสผ่าน", SIGNUP: "สมัครสมาชิก", DEV: "ปุ่มทดสอบ" };
+const METHOD_TH: Record<string, string> = { PASSWORD: "รหัสผ่าน", SIGNUP: "สมัครสมาชิก", DEV: "ปุ่มทดสอบ", GOOGLE: "บัญชี Google" };
 
 const baht = (cents: number) => (cents === 0 ? "ฟรี" : `฿${(cents / 100).toLocaleString("th-TH")}`);
 
