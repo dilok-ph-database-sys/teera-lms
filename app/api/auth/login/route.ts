@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/password";
+import { rateLimit, resetRateLimit, clientIp } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,6 +21,21 @@ const INVALID = NextResponse.json(
 );
 
 export async function POST(req: Request) {
+  // ── กันเดารหัสผ่าน: ยิงผิดได้ไม่เกิน 8 ครั้งต่อ 10 นาที ต่อ 1 IP ──
+  const ip = clientIp(req);
+  const gate = rateLimit(`login:${ip}`, 8, 600);
+  if (!gate.allowed) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "TOO_MANY_ATTEMPTS",
+          message: `ลองเข้าสู่ระบบผิดหลายครั้งเกินไป กรุณารออีก ${Math.ceil(gate.retryAfterSec / 60)} นาทีแล้วลองใหม่`,
+        },
+      },
+      { status: 429, headers: { "Retry-After": String(gate.retryAfterSec) } },
+    );
+  }
+
   const parsed = BodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
@@ -59,6 +75,9 @@ export async function POST(req: Request) {
       data: { passwordHash: await hashPassword(password) },
     });
   }
+
+  // เข้าสำเร็จ → ล้างตัวนับทิ้ง
+  resetRateLimit(`login:${ip}`);
 
   // บันทึกการเข้าใช้งาน (ใช้ในหน้าผู้ดูแล) — ถ้าบันทึกไม่ได้ก็ไม่ขวางการล็อกอิน
   await prisma.loginEvent.create({ data: { userId: user.id, method: "PASSWORD" } }).catch(() => {});
