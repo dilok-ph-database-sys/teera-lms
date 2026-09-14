@@ -40,7 +40,12 @@ export async function GET() {
   const admin = await requireAdmin();
   if (admin instanceof NextResponse) return admin;
 
-  const [instructors, students, admins, courses, activity] = await Promise.all([
+  // ── ช่วงเวลาสำหรับสรุปยอดเดือนนี้ ──
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [instructors, students, admins, courses, activity, orders, paidEnrollments, revenueAll, revenueMonth] =
+    await Promise.all([
     prisma.user.findMany({
       where: { role: "INSTRUCTOR" },
       select: USER_FIELDS,
@@ -74,7 +79,35 @@ export async function GET() {
         user: { select: { id: true, fullName: true, email: true, role: true, avatarEmoji: true, avatarUrl: true } },
       },
     }),
+    // ── รายการชำระเงิน ──
+    prisma.order.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 300,
+      select: {
+        id: true, orderNo: true, totalCents: true, currency: true,
+        status: true, createdAt: true, paidAt: true,
+        user: { select: { id: true, fullName: true, email: true, role: true, avatarEmoji: true, avatarUrl: true } },
+        payments: { select: { provider: true, status: true, amountCents: true, paidAt: true } },
+      },
+    }),
+    // ใช้จับคู่ว่าคำสั่งซื้อนั้นเป็นของวิชาไหน
+    prisma.enrollment.findMany({
+      where: { orderId: { not: null } },
+      select: { orderId: true, course: { select: { title: true, icon: true } } },
+    }),
+    prisma.order.aggregate({ where: { status: "PAID" }, _sum: { totalCents: true }, _count: { _all: true } }),
+    prisma.order.aggregate({
+      where: { status: "PAID", paidAt: { gte: monthStart } },
+      _sum: { totalCents: true },
+      _count: { _all: true },
+    }),
   ]);
+
+  // orderId → ชื่อวิชา
+  const orderCourse: Record<string, { title: string; icon: string }> = {};
+  for (const e of paidEnrollments) {
+    if (e.orderId) orderCourse[e.orderId] = { title: e.course.title, icon: e.course.icon };
+  }
 
   // สรุปครั้งล่าสุด + จำนวนครั้งของแต่ละคน
   const grouped = await prisma.loginEvent.groupBy({
@@ -91,6 +124,13 @@ export async function GET() {
   return NextResponse.json({
     data: {
       instructors, students, admins, courses, categories, activity, summary,
+      orders, orderCourse,
+      finance: {
+        totalCents: revenueAll._sum.totalCents ?? 0,
+        totalOrders: revenueAll._count._all,
+        monthCents: revenueMonth._sum.totalCents ?? 0,
+        monthOrders: revenueMonth._count._all,
+      },
       stats: {
         instructors: instructors.length,
         students: students.length,
