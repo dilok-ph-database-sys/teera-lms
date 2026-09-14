@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma as db } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
+import { DEV_TOOLS_ENABLED } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -140,7 +141,18 @@ async function seed() {
   return { users: 4, courses: 3, enrollments: 2, certificates: 1 };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // ปิดโหมดทดสอบแล้ว ต้องแนบกุญแจ ?key=<SEED_KEY> ถึงจะ seed ได้
+  if (!DEV_TOOLS_ENABLED) {
+    const key = new URL(req.url).searchParams.get("key");
+    if (!process.env.SEED_KEY || key !== process.env.SEED_KEY) {
+      return NextResponse.json(
+        { ok: false, message: "ปิดการใส่ข้อมูลตัวอย่างแล้ว (ต้องใส่กุญแจให้ถูกต้อง)" },
+        { status: 403 },
+      );
+    }
+  }
+
   try {
     const result = await seed();
     return NextResponse.json({
