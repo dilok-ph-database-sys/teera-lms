@@ -11,8 +11,10 @@ import { randomBytes } from "crypto";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/** ที่อยู่ปลายทางที่ Google จะส่งผู้ใช้กลับมา */
-export function redirectUri(req: Request) {
+/** ที่อยู่ปลายทางที่ Google จะส่งผู้ใช้กลับมา
+ *  หมายเหตุ: ห้ามใส่ export หน้าฟังก์ชันนี้ — ไฟล์ route.ts ของ Next.js
+ *  อนุญาตให้ export ได้เฉพาะ GET / POST / dynamic / runtime เท่านั้น */
+function redirectUri(req: Request) {
   return process.env.GOOGLE_REDIRECT_URI || new URL("/api/auth/google/callback", req.url).toString();
 }
 
