@@ -99,6 +99,10 @@ export async function GET() {
             select: {
               id: true, title: true, type: true, videoUrl: true, videoKind: true,
               overviewHtml: true, durationSec: true, position: true, isPreview: true,
+              questions: {
+                orderBy: { position: "asc" },
+                select: { id: true, text: true, choices: true, correctIndex: true, explain: true, position: true },
+              },
             },
           },
         },
@@ -307,6 +311,77 @@ export async function POST(req: Request) {
       if (!(await assertOwnsCourse(user, p.data.id))) return fail("ไม่มีสิทธิ์แก้คอร์สนี้", 403);
 
       await prisma.course.update({ where: { id: p.data.id }, data: { status: p.data.status } });
+      return NextResponse.json({ data: { ok: true } });
+    }
+
+    // ── คำถามแบบทดสอบ (Quiz) ───────────────────────────────────────────────
+    case "question.create":
+    case "question.update": {
+      const isNew = head.data.action === "question.create";
+      const schema = z.object({
+        ...(isNew ? { lessonId: z.string().min(1) } : { id: z.string().min(1) }),
+        text: z.string().trim().min(1, "กรุณากรอกคำถาม").max(500),
+        choices: z.array(z.string().trim().min(1, "ตัวเลือกห้ามว่าง").max(200)).min(2, "ต้องมีอย่างน้อย 2 ตัวเลือก").max(6),
+        correctIndex: z.number().int().min(0).max(5),
+        explain: z.string().trim().max(500).optional().or(z.literal("")),
+      });
+      const p = schema.safeParse(body);
+      if (!p.success) return fail(p.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง");
+      const d = p.data as {
+        lessonId?: string; id?: string;
+        text: string; choices: string[]; correctIndex: number; explain?: string;
+      };
+      if (d.correctIndex >= d.choices.length) return fail("ข้อที่เลือกเป็นคำตอบถูก ไม่มีอยู่ในตัวเลือก");
+
+      if (isNew) {
+        if (!(await assertOwnsLesson(user, d.lessonId!))) return fail("ไม่มีสิทธิ์แก้บทเรียนนี้", 403);
+        const last = await prisma.quizQuestion.findFirst({
+          where: { lessonId: d.lessonId! },
+          orderBy: { position: "desc" },
+          select: { position: true },
+        });
+        const q = await prisma.quizQuestion.create({
+          data: {
+            lessonId: d.lessonId!,
+            text: d.text,
+            choices: JSON.stringify(d.choices),
+            correctIndex: d.correctIndex,
+            explain: d.explain || null,
+            position: (last?.position ?? 0) + 1,
+          },
+          select: { id: true },
+        });
+        return NextResponse.json({ data: q });
+      }
+
+      const owned = await prisma.quizQuestion.findFirst({
+        where: { id: d.id!, lesson: { module: { course: scopeOf(user) } } },
+        select: { id: true },
+      });
+      if (!owned) return fail("ไม่มีสิทธิ์แก้คำถามนี้", 403);
+
+      await prisma.quizQuestion.update({
+        where: { id: d.id! },
+        data: {
+          text: d.text,
+          choices: JSON.stringify(d.choices),
+          correctIndex: d.correctIndex,
+          explain: d.explain || null,
+        },
+      });
+      return NextResponse.json({ data: { ok: true } });
+    }
+
+    case "question.delete": {
+      const p = IdOnly.safeParse(body);
+      if (!p.success) return fail("ข้อมูลไม่ถูกต้อง");
+      const owned = await prisma.quizQuestion.findFirst({
+        where: { id: p.data.id, lesson: { module: { course: scopeOf(user) } } },
+        select: { id: true },
+      });
+      if (!owned) return fail("ไม่มีสิทธิ์ลบคำถามนี้", 403);
+
+      await prisma.quizQuestion.delete({ where: { id: p.data.id } });
       return NextResponse.json({ data: { ok: true } });
     }
 
