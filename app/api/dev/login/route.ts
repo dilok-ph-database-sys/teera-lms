@@ -2,6 +2,7 @@
 // ตอนขึ้นจริงลบไฟล์นี้ แล้วใช้ Supabase Auth callback แทน
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { DEV_TOOLS_ENABLED } from "@/lib/ratelimit";
 
 // ⚠️ ใช้สำหรับ "ทดสอบ" เท่านั้น — ทางลัดนี้ข้ามการตรวจรหัสผ่าน
 // ก่อนเปิดให้คนนอกใช้จริง ให้ลบทั้งโฟลเดอร์ app/api/dev/ ออก
@@ -12,11 +13,19 @@ const MAP: Record<string, string> = {
 };
 
 export async function POST(req: Request) {
+  // ปิดทางลัดนี้ได้ด้วยการตั้ง DEV_TOOLS = off ใน Vercel
+  if (!DEV_TOOLS_ENABLED) {
+    return NextResponse.json(
+      { error: { code: "DISABLED", message: "ปิดโหมดทดสอบแล้ว กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน" } },
+      { status: 403 },
+    );
+  }
+
   const as = new URL(req.url).searchParams.get("as") ?? "student";
   const uid = MAP[as];
   if (!uid) {
     return NextResponse.json(
-      { error: { code: "FORBIDDEN", message: "บัญชีทดลองใช้ได้เฉพาะบทบาทนักเรียน" } },
+      { error: { code: "FORBIDDEN", message: "บทบาทนี้ไม่มีบัญชีทดลอง" } },
       { status: 403 },
     );
   }
