@@ -2,12 +2,13 @@
 //   1. ผู้สอน            — เพิ่ม / แก้ไข / ลบ
 //   2. การเข้าใช้งาน      — ดูว่าใครเข้าระบบเมื่อไหร่ กี่ครั้ง
 //   3. วิชาและหมวด        — เพิ่ม / แก้ไข / ลบวิชา และจัดการหมวด
+//   4. การเงิน            — ตรวจสอบรายการชำระเงินและยอดรวม
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 import {
   Loader2, AlertCircle, CheckCircle2, Users, Activity, BookOpen,
-  Plus, Pencil, Trash2, X, Search, ShieldCheck,
+  Plus, Pencil, Trash2, X, Search, ShieldCheck, Wallet, Download, CreditCard,
 } from "lucide-react";
 
 // ── ชนิดข้อมูล ───────────────────────────────────────────────────────────────
@@ -30,6 +31,13 @@ type Event = {
   user: { id: string; fullName: string; email: string; role: string; avatarEmoji: string; avatarUrl: string | null };
 };
 
+type Order = {
+  id: string; orderNo: string; totalCents: number; currency: string;
+  status: string; createdAt: string; paidAt: string | null;
+  user: { id: string; fullName: string; email: string; role: string; avatarEmoji: string; avatarUrl: string | null };
+  payments: { provider: string; status: string; amountCents: number; paidAt: string | null }[];
+};
+
 type AdminData = {
   instructors: Person[];
   students: Person[];
@@ -38,11 +46,29 @@ type AdminData = {
   categories: string[];
   activity: Event[];
   summary: Record<string, { count: number; lastAt: string | null }>;
+  orders: Order[];
+  orderCourse: Record<string, { title: string; icon: string }>;
+  finance: { totalCents: number; totalOrders: number; monthCents: number; monthOrders: number };
   stats: { instructors: number; students: number; courses: number; categories: number };
 };
 
 const ROLE_TH: Record<string, string> = { ADMIN: "ผู้ดูแลระบบ", INSTRUCTOR: "ผู้สอน", STUDENT: "นักเรียน" };
 const METHOD_TH: Record<string, string> = { PASSWORD: "รหัสผ่าน", SIGNUP: "สมัครสมาชิก", DEV: "ปุ่มทดสอบ", GOOGLE: "บัญชี Google" };
+
+/** สถานะคำสั่งซื้อ */
+const ORDER_TH: Record<string, { label: string; cls: string }> = {
+  PAID: { label: "ชำระแล้ว", cls: "bg-green-100 text-green-700" },
+  PENDING: { label: "รอชำระ", cls: "bg-amber-100 text-amber-700" },
+  FAILED: { label: "ไม่สำเร็จ", cls: "bg-rose-100 text-rose-600" },
+};
+
+/** ช่องทางชำระเงิน */
+const PROVIDER_TH: Record<string, string> = {
+  DEV: "โหมดทดสอบ", STRIPE: "บัตรเครดิต", PROMPTPAY: "PromptPay",
+};
+
+/** จำนวนเงินเต็มรูปแบบ เช่น ฿1,590 */
+const money = (cents: number) => `฿${(cents / 100).toLocaleString("th-TH")}`;
 
 const baht = (cents: number) => (cents === 0 ? "ฟรี" : `฿${(cents / 100).toLocaleString("th-TH")}`);
 
@@ -70,7 +96,7 @@ const inputCls =
 
 // ═════════════════════════════════════════════════════════════════════════════
 export function AdminConsole({ adminName }: { adminName: string }) {
-  const [tab, setTab] = useState<"instructors" | "activity" | "courses">("instructors");
+  const [tab, setTab] = useState<"instructors" | "activity" | "courses" | "finance">("instructors");
   const [data, setData] = useState<AdminData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +149,7 @@ export function AdminConsole({ adminName }: { adminName: string }) {
     { key: "instructors", label: "ผู้สอน", icon: Users, count: data?.stats.instructors },
     { key: "activity", label: "การเข้าใช้งาน", icon: Activity, count: data?.activity.length },
     { key: "courses", label: "วิชาและหมวด", icon: BookOpen, count: data?.stats.courses },
+    { key: "finance", label: "การเงิน", icon: Wallet, count: data?.orders.length },
   ] as const;
 
   return (
@@ -191,6 +218,7 @@ export function AdminConsole({ adminName }: { adminName: string }) {
         {tab === "instructors" && <InstructorsTab data={data!} run={run} />}
         {tab === "activity" && <ActivityTab data={data!} />}
         {tab === "courses" && <CoursesTab data={data!} run={run} />}
+        {tab === "finance" && <FinanceTab data={data!} />}
       </div>
     </main>
   );
@@ -695,6 +723,192 @@ function CoursesTab({ data, run }: { data: AdminData; run: RunFn }) {
           </div>
         ))
       )}
+    </section>
+  );
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 4) การเงิน — ตรวจสอบรายการชำระเงิน
+// ═════════════════════════════════════════════════════════════════════════════
+function FinanceTab({ data }: { data: AdminData }) {
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState<"ALL" | "PAID" | "PENDING" | "FAILED">("ALL");
+
+  const rows = data.orders.filter((o) => {
+    if (status !== "ALL" && o.status !== status) return false;
+    if (!q.trim()) return true;
+    const t = q.toLowerCase();
+    const course = data.orderCourse[o.id]?.title ?? "";
+    return (
+      o.orderNo.toLowerCase().includes(t) ||
+      o.user.fullName.toLowerCase().includes(t) ||
+      o.user.email.toLowerCase().includes(t) ||
+      course.toLowerCase().includes(t)
+    );
+  });
+
+  /** ยอดรวมของรายการที่กรองอยู่ (เฉพาะที่ชำระแล้ว) */
+  const shownPaid = rows.filter((o) => o.status === "PAID").reduce((n, o) => n + o.totalCents, 0);
+
+  /** ดาวน์โหลดเป็นไฟล์ CSV เปิดด้วย Excel ได้ */
+  function exportCsv() {
+    const head = ["เลขที่คำสั่งซื้อ", "วันที่", "ผู้ซื้อ", "อีเมล", "วิชา", "ช่องทาง", "จำนวนเงิน (บาท)", "สถานะ"];
+    const lines = rows.map((o) => [
+      o.orderNo,
+      thaiDateTime(o.paidAt ?? o.createdAt),
+      o.user.fullName,
+      o.user.email,
+      data.orderCourse[o.id]?.title ?? "—",
+      PROVIDER_TH[o.payments[0]?.provider ?? ""] ?? o.payments[0]?.provider ?? "—",
+      (o.totalCents / 100).toString(),
+      ORDER_TH[o.status]?.label ?? o.status,
+    ]);
+    const csv = [head, ...lines]
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    // \uFEFF = BOM ให้ Excel อ่านภาษาไทยไม่เพี้ยน
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `teera-payments-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  return (
+    <section>
+      {/* สรุปยอด */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-[24px] bg-gradient-to-br from-brand to-sun p-6 text-white shadow-card">
+          <p className="flex items-center gap-2 text-sm font-bold text-white/85">
+            <Wallet className="h-4 w-4" /> รายรับทั้งหมด
+          </p>
+          <p className="mt-2 font-display text-3xl font-extrabold">{money(data.finance.totalCents)}</p>
+          <p className="mt-1 text-sm text-white/80">{data.finance.totalOrders} รายการที่ชำระแล้ว</p>
+        </div>
+        <div className="rounded-[24px] bg-white p-6 shadow-card">
+          <p className="text-sm font-bold text-ink/60">รายรับเดือนนี้</p>
+          <p className="mt-2 font-display text-3xl font-extrabold text-brand">{money(data.finance.monthCents)}</p>
+          <p className="mt-1 text-sm text-ink/50">{data.finance.monthOrders} รายการ</p>
+        </div>
+        <div className="rounded-[24px] bg-white p-6 shadow-card">
+          <p className="text-sm font-bold text-ink/60">ยอดตามที่กรองอยู่</p>
+          <p className="mt-2 font-display text-3xl font-extrabold text-ink">{money(shownPaid)}</p>
+          <p className="mt-1 text-sm text-ink/50">จาก {rows.length} รายการที่แสดง</p>
+        </div>
+      </div>
+
+      {/* ตัวกรอง */}
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-orange-300" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="ค้นหาเลขที่ / ชื่อผู้ซื้อ / อีเมล / ชื่อวิชา"
+            className={`${inputCls} pl-10`}
+          />
+        </div>
+        {(["ALL", "PAID", "PENDING", "FAILED"] as const).map((st) => (
+          <button
+            key={st}
+            onClick={() => setStatus(st)}
+            className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+              status === st ? "bg-brand text-white shadow-soft" : "border border-orange-200 text-ink/60 hover:bg-orange-50"
+            }`}
+          >
+            {st === "ALL" ? "ทั้งหมด" : ORDER_TH[st].label}
+          </button>
+        ))}
+        <button
+          onClick={exportCsv}
+          disabled={rows.length === 0}
+          className="inline-flex items-center gap-2 rounded-xl border border-orange-200 px-4 py-2.5 text-sm font-bold text-ink/70 transition hover:bg-orange-50 disabled:opacity-50"
+        >
+          <Download className="h-4 w-4" /> ดาวน์โหลด CSV
+        </button>
+      </div>
+
+      {/* ตารางรายการ */}
+      <div className="mt-5">
+        {rows.length === 0 ? (
+          <EmptyBox
+            text={
+              data.orders.length === 0
+                ? "ยังไม่มีรายการชำระเงิน — เมื่อมีคนซื้อคอร์ส รายการจะขึ้นที่นี่"
+                : "ไม่พบรายการที่ค้นหา"
+            }
+          />
+        ) : (
+          <div className="overflow-hidden rounded-[24px] bg-white shadow-soft">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[820px] text-sm">
+                <thead className="bg-orange-50 text-left text-xs text-ink/60">
+                  <tr>
+                    <th className="px-4 py-3 font-bold">เลขที่ / วันที่</th>
+                    <th className="px-4 py-3 font-bold">ผู้ซื้อ</th>
+                    <th className="px-4 py-3 font-bold">วิชา</th>
+                    <th className="px-4 py-3 font-bold">ช่องทาง</th>
+                    <th className="px-4 py-3 text-right font-bold">จำนวนเงิน</th>
+                    <th className="px-4 py-3 font-bold">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((o) => {
+                    const course = data.orderCourse[o.id];
+                    const pay = o.payments[0];
+                    const st = ORDER_TH[o.status] ?? { label: o.status, cls: "bg-ink/10 text-ink/60" };
+                    return (
+                      <tr key={o.id} className="border-t border-orange-50">
+                        <td className="px-4 py-3">
+                          <p className="font-mono text-xs font-bold">{o.orderNo}</p>
+                          <p className="mt-0.5 text-xs text-ink/45">{thaiDateTime(o.paidAt ?? o.createdAt)}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <Avatar p={o.user} size="h-8 w-8" />
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold">{o.user.fullName}</p>
+                              <p className="truncate text-xs text-ink/45">{o.user.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {course ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <span>{course.icon}</span>
+                              <span className="truncate">{course.title}</span>
+                            </span>
+                          ) : (
+                            <span className="text-ink/35">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1.5 text-ink/65">
+                            <CreditCard className="h-3.5 w-3.5 text-orange-400" />
+                            {PROVIDER_TH[pay?.provider ?? ""] ?? pay?.provider ?? "—"}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-display text-base font-extrabold">
+                          {money(o.totalCents)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${st.cls}`}>{st.label}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <p className="mt-4 text-xs text-ink/45">
+        * ตอนนี้ระบบยังอยู่ในโหมดทดสอบ — รายการที่ขึ้นว่า “โหมดทดสอบ” คือการกดจ่ายจำลอง ไม่มีการตัดเงินจริง
+      </p>
     </section>
   );
 }
