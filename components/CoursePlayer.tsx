@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { QuizRunner } from "./QuizRunner";
 import {
   CheckCircle2, PlayCircle, Lock, FileText, PenLine, Paperclip, ChevronDown,
   ChevronRight, X, ListVideo, AlertCircle, Check, Loader2, RotateCcw,
@@ -135,7 +136,9 @@ export function CoursePlayer({ course, initialLessonId, completedLessonIds }: Pr
 
       <div className="mx-auto grid max-w-[1400px] grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]">
         <main className="min-w-0">
-          <VideoPlayer lesson={current} onEnded={() => { if (!completed.has(current.id)) toggle(current.id); }} />
+          {current.type !== "QUIZ" && (
+            <VideoPlayer lesson={current} onEnded={() => { if (!completed.has(current.id)) toggle(current.id); }} />
+          )}
           <div className="p-4 sm:p-6">
             <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
               <div><h2 className="text-lg font-semibold">{current.title}</h2><p className="mt-1 text-sm text-slate-500">บทเรียนที่ {idx + 1} จาก {lessons.length}</p></div>
@@ -149,6 +152,15 @@ export function CoursePlayer({ course, initialLessonId, completedLessonIds }: Pr
               </div>
             </div>
             {error && <div className="mt-4 flex items-center gap-2 rounded-lg bg-rose-50 px-4 py-2.5 text-sm text-rose-700"><AlertCircle className="h-4 w-4" />{error}</div>}
+            {current.type === "QUIZ" && (
+              <div className="mt-5">
+                {/* ทำแบบทดสอบ — ผ่านเกณฑ์แล้วจะทำเครื่องหมายว่าเรียนจบให้อัตโนมัติ */}
+                <QuizRunner
+                  lessonId={current.id}
+                  onPassed={() => { if (!completed.has(current.id)) toggle(current.id); }}
+                />
+              </div>
+            )}
             <div className="mt-5"><Tabs lesson={current} /></div>
           </div>
         </main>
