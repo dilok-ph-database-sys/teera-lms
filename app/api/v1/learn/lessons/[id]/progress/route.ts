@@ -51,8 +51,37 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       data: { progressPercent: percent, status: percent === 100 ? "COMPLETED" : "ACTIVE", completedAt: percent === 100 ? new Date() : null },
       select: { progressPercent: true, status: true },
     });
-    return updated;
+
+    // ── เรียนครบ 100% → ออกใบรับรองให้อัตโนมัติ (ออกครั้งเดียว ไม่ซ้ำ) ──
+    let certificate: { serial: string } | null = null;
+    if (percent === 100 && totalLessons > 0) {
+      const existing = await tx.certificate.findUnique({
+        where: { enrollmentId },
+        select: { serial: true },
+      });
+      if (existing) {
+        certificate = existing;
+      } else {
+        // เลขที่ใบรับรอง เช่น TEERA-2026-000007 (นับจากจำนวนใบที่ออกไปแล้ว)
+        const issued = await tx.certificate.count();
+        const serial = `TEERA-${new Date().getFullYear() + 543 - 543}-${String(issued + 1).padStart(6, "0")}`;
+        certificate = await tx.certificate.create({
+          data: { enrollmentId, serial, pdfUrl: null },
+          select: { serial: true },
+        });
+      }
+    }
+
+    return { ...updated, certificate };
   });
 
-  return NextResponse.json({ data: { lessonId, isCompleted, progressPercent: result.progressPercent, status: result.status } });
+  return NextResponse.json({
+    data: {
+      lessonId,
+      isCompleted,
+      progressPercent: result.progressPercent,
+      status: result.status,
+      certificateSerial: result.certificate?.serial ?? null,
+    },
+  });
 }
