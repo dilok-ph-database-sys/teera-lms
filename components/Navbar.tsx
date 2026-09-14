@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Settings } from "lucide-react";
+import { Settings, Layers } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 
 /** ชื่อบทบาทเป็นภาษาไทย */
@@ -46,6 +46,17 @@ export async function Navbar() {
         <div className="ml-auto flex items-center gap-2">
           {user ? (
             <>
+              {/* 📚 จัดการบทเรียน — ผู้สอนและผู้ดูแลระบบ */}
+              {(user.role === "INSTRUCTOR" || user.role === "ADMIN") && (
+                <Link
+                  href="/teach"
+                  title="จัดการบทเรียน"
+                  className="hidden items-center gap-1.5 rounded-xl border border-orange-200 bg-white px-4 py-2.5 text-[15px] font-bold text-ink/70 transition hover:border-brand hover:bg-orange-50 hover:text-brand sm:inline-flex"
+                >
+                  <Layers className="h-4 w-4" /> บทเรียน
+                </Link>
+              )}
+
               {/* ⚙️ ตั้งค่าระบบ — เห็นเฉพาะผู้ดูแลระบบ */}
               {user.role === "ADMIN" && (
                 <Link
