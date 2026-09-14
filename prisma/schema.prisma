@@ -33,6 +33,8 @@ model User {
   orders      Order[]
   loginEvents LoginEvent[]
   schedule    ScheduleItem[]
+  reviews     Review[]
+  quizAttempts QuizAttempt[]
 }
 
 model Course {
@@ -56,6 +58,7 @@ model Course {
 
   modules     Module[]
   enrollments Enrollment[]
+  reviews     Review[]
 }
 
 model Module {
@@ -79,8 +82,10 @@ model Lesson {
   position    Int
   isPreview   Boolean @default(false)
 
-  module   Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  progress LessonProgress[]
+  module    Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress  LessonProgress[]
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
 }
 
 model Enrollment {
@@ -178,4 +183,51 @@ model ScheduleItem {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
+}
+
+/// รีวิวและให้ดาวคอร์ส — 1 คนต่อ 1 คอร์ส (แก้ไขทับของเดิมได้)
+model Review {
+  id        String   @id @default(cuid())
+  courseId  String
+  userId    String
+  rating    Int      // 1–5 ดาว
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, userId])
+  @@index([courseId, createdAt])
+}
+
+/// คำถามของแบบทดสอบ — ผูกกับบทเรียนที่ type = QUIZ
+model QuizQuestion {
+  id           String  @id @default(cuid())
+  lessonId     String
+  text         String
+  choices      String  // เก็บเป็น JSON เช่น ["ตัวเลือก ก","ตัวเลือก ข"]
+  correctIndex Int     // ลำดับตัวเลือกที่ถูก (เริ่มจาก 0) — ห้ามส่งค่านี้ออกไปฝั่งนักเรียน
+  explain      String? // คำอธิบายเฉลย
+  position     Int
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId, position])
+}
+
+/// ผลการทำแบบทดสอบแต่ละครั้ง
+model QuizAttempt {
+  id        String   @id @default(cuid())
+  lessonId  String
+  userId    String
+  score     Int
+  total     Int
+  createdAt DateTime @default(now())
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId, userId])
 }
