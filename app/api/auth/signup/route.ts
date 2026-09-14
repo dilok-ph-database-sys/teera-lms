@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/password";
+import { rateLimit, clientIp } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,6 +19,15 @@ const BodySchema = z.object({
 });
 
 export async function POST(req: Request) {
+  // กันสมัครบัญชีรัว ๆ: ไม่เกิน 5 บัญชีต่อ 1 ชั่วโมง ต่อ 1 IP
+  const gate = rateLimit(`signup:${clientIp(req)}`, 5, 3600);
+  if (!gate.allowed) {
+    return NextResponse.json(
+      { error: { code: "TOO_MANY_ATTEMPTS", message: "สมัครสมาชิกถี่เกินไป กรุณารอสักครู่แล้วลองใหม่" } },
+      { status: 429 },
+    );
+  }
+
   const parsed = BodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
